@@ -1,176 +1,497 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, CheckCircle2, Circle, ListTodo, Sparkles } from 'lucide-react';
-
-export default function App() {
-  const [tasks, setTasks] = useState([
-    { id: 1, text: 'قراءة كتاب جديد', completed: false },
-    { id: 2, text: 'ممارسة الرياضة لمدة 30 دقيقة', completed: true },
-    { id: 3, text: 'تعلم شيء جديد في البرمجة', completed: false },
-  ]);
-  const [newTask, setNewTask] = useState('');
-
-  const addTask = (e) => {
-    e.preventDefault();
-    if (newTask.trim() === '') return;
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>قائمة المهام</title>
+    <!-- استدعاء Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- استدعاء أيقونات Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     
-    const newTaskObj = {
-      id: Date.now(),
-      text: newTask,
-      completed: false,
-    };
-    
-    setTasks([newTaskObj, ...tasks]);
-    setNewTask('');
-  };
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 
-  const toggleComplete = (id) => {
-    setTasks(
-      tasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
-  };
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: linear-gradient(to bottom right, #ede9fe, #fae8ff, #ffe4e6);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            color: #1e293b;
+        }
 
-  const deleteTask = (id) => {
-    setTasks(tasks.filter((task) => task.id !== id));
-  };
-
-  // حساب الإحصائيات
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.completed).length;
-  const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
-
-  return (
-    <div 
-      dir="rtl" 
-      className="min-h-screen bg-gradient-to-br from-violet-100 via-fuchsia-100 to-rose-100 flex items-center justify-center p-4 font-sans text-slate-800"
-    >
-      <div className="max-w-md w-full bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/50">
+        /* تخصيص شريط التمرير */
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
         
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-8 text-white relative overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
-          
-          <div className="relative z-10 flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <ListTodo className="w-8 h-8" />
-              مهامي
-            </h1>
-            <Sparkles className="w-6 h-6 text-fuchsia-200" />
-          </div>
-          <p className="relative z-10 text-violet-100 opacity-90 mt-2">
-            نظم يومك وحقق أهدافك بكل سهولة.
-          </p>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-          {/* Progress Bar */}
-          <div className="mt-6 relative z-10">
-            <div className="flex justify-between text-sm font-medium mb-2 text-violet-100">
-              <span>نسبة الإنجاز</span>
-              <span>{progress}%</span>
+        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* * ==========================================
+         * حركة السحب الطبيعية (Simple Swipe to Delete)
+         * ==========================================
+         */
+        
+        .swipe-out-right {
+            animation: swipeRight 0.3s ease-in forwards;
+            pointer-events: none;
+        }
+
+        .swipe-out-left {
+            animation: swipeLeft 0.3s ease-in forwards;
+            pointer-events: none;
+        }
+
+        @keyframes swipeRight {
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes swipeLeft {
+            to {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+        }
+
+        .task-card {
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            touch-action: pan-y;
+        }
+        .task-card.dragging {
+            transition: none;
+            cursor: grabbing !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="max-w-md w-full bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/50 flex flex-col max-h-[90vh]">
+        
+        <!-- Header Section -->
+        <div class="flex-shrink-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 p-8 pb-6 text-white relative overflow-hidden">
+            <div class="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-black/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div class="relative z-10 flex items-center justify-between mb-2">
+                <!-- الأيقونة في اليمين -->
+                <div class="flex-1 flex justify-start">
+                    <i data-lucide="list-todo" class="w-8 h-8"></i>
+                </div>
+                
+                <!-- العنوان في المنتصف -->
+                <h1 class="text-3xl font-bold text-center">
+                    مهامي
+                </h1>
+                
+                <!-- النجوم في اليسار -->
+                <div class="flex-1 flex justify-end">
+                    <i data-lucide="sparkles" class="w-6 h-6 text-fuchsia-200"></i>
+                </div>
             </div>
-            <div className="w-full bg-black/20 rounded-full h-2.5 backdrop-blur-sm">
-              <div 
-                className="bg-white h-2.5 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${progress}%` }}
-              ></div>
+
+            <!-- Progress Bar -->
+            <div class="mt-5 relative z-10">
+                <div class="flex justify-between text-sm font-medium mb-2 text-violet-100">
+                    <span>الإنجاز العام</span>
+                    <span id="progressText">0%</span>
+                </div>
+                <div class="w-full bg-black/20 rounded-full h-2.5 backdrop-blur-sm overflow-hidden">
+                    <div id="progressBar" class="bg-white h-full rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+                </div>
             </div>
-          </div>
         </div>
 
-        {/* Input Section */}
-        <div className="p-6 pb-2">
-          <form onSubmit={addTask} className="relative">
-            <input
-              type="text"
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              placeholder="ما الذي تريد إنجازه اليوم؟"
-              className="w-full pl-14 pr-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-400/20 transition-all text-lg placeholder-slate-400"
-            />
-            <button
-              type="submit"
-              disabled={!newTask.trim()}
-              className="absolute left-2 top-2 bottom-2 bg-violet-600 text-white p-2 rounded-xl hover:bg-violet-700 disabled:opacity-50 disabled:hover:bg-violet-600 transition-colors flex items-center justify-center aspect-square"
-            >
-              <Plus className="w-6 h-6" />
-            </button>
-          </form>
+        <!-- Filters Section -->
+        <div class="flex-shrink-0 bg-white border-b border-slate-100 p-3 overflow-x-auto hide-scrollbar">
+            <div class="flex gap-2 w-max px-2" id="filtersContainer">
+                <!-- الأزرار ستضاف هنا عبر الجافاسكربت -->
+            </div>
         </div>
 
-        {/* Tasks List Section */}
-        <div className="p-6 pt-4 max-h-[50vh] overflow-y-auto custom-scrollbar">
-          {tasks.length === 0 ? (
-            <div className="text-center py-10 flex flex-col items-center justify-center opacity-50">
-              <ListTodo className="w-16 h-16 mb-4 text-slate-400" />
-              <p className="text-lg text-slate-500">لا توجد مهام حالياً.</p>
-              <p className="text-sm text-slate-400 mt-1">أضف مهمتك الأولى بالأعلى!</p>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {tasks.map((task) => (
-                <li 
-                  key={task.id}
-                  className={`group flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 hover:shadow-md ${
-                    task.completed 
-                      ? 'bg-slate-50/50 border-slate-100 opacity-75' 
-                      : 'bg-white border-slate-200 shadow-sm hover:border-violet-200'
-                  }`}
-                >
-                  <div 
-                    className="flex items-center gap-4 flex-1 cursor-pointer"
-                    onClick={() => toggleComplete(task.id)}
-                  >
-                    <button className={`flex-shrink-0 transition-colors duration-300 ${
-                      task.completed ? 'text-emerald-500' : 'text-slate-300 hover:text-violet-500'
-                    }`}>
-                      {task.completed ? (
-                        <CheckCircle2 className="w-7 h-7" />
-                      ) : (
-                        <Circle className="w-7 h-7" />
-                      )}
+        <!-- Input Section -->
+        <div class="flex-shrink-0 p-5 pb-3 bg-slate-50/50">
+            <form id="taskForm" class="flex flex-col gap-3">
+                <div class="relative flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <input
+                            type="text"
+                            id="taskInput"
+                            placeholder="ما الذي تريد إنجازه؟"
+                            class="w-full pl-4 pr-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-400/20 transition-all text-base placeholder-slate-400 shadow-sm"
+                        />
+                    </div>
+                    
+                    <div class="relative">
+                        <input
+                            type="date"
+                            id="dateInput"
+                            class="w-12 h-12 p-2 opacity-0 absolute inset-0 z-10 cursor-pointer"
+                            title="إضافة تاريخ للمهمة"
+                        />
+                        <div id="dateIconBg" class="w-12 h-12 flex items-center justify-center rounded-xl border-2 transition-all border-slate-200 bg-white text-slate-400">
+                            <i data-lucide="calendar" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        id="submitBtn"
+                        disabled
+                        class="bg-violet-600 text-white p-3.5 rounded-xl hover:bg-violet-700 disabled:opacity-50 disabled:hover:bg-violet-600 transition-all flex items-center justify-center shadow-md shadow-violet-200 active:scale-95"
+                    >
+                        <i data-lucide="plus" class="w-5 h-5"></i>
                     </button>
-                    <span className={`text-lg transition-all duration-300 ${
-                      task.completed ? 'line-through text-slate-400' : 'text-slate-700'
-                    }`}>
-                      {task.text}
-                    </span>
-                  </div>
-                  
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-all duration-200 focus:opacity-100 mr-2"
-                    aria-label="حذف المهمة"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </li>
-              ))}
+                </div>
+            </form>
+        </div>
+
+        <!-- Tasks List Section -->
+        <div class="flex-1 p-5 overflow-y-auto custom-scrollbar" id="tasksListContainer">
+            <ul id="tasksList" class="space-y-1">
+                <!-- المهام ستضاف هنا -->
             </ul>
-          )}
+            <div id="emptyState" class="hidden text-center py-12 flex flex-col items-center justify-center opacity-50 h-full animate-fade-in">
+                <i data-lucide="list-todo" class="w-16 h-16 mb-4 text-slate-400"></i>
+                <p class="text-lg text-slate-500 font-medium">لا توجد مهام هنا.</p>
+                <p id="emptyStateSub" class="text-sm text-slate-400 mt-1">أضف مهمتك الأولى لتنظيم وقتك.</p>
+            </div>
         </div>
         
-        {/* Footer */}
-        {tasks.length > 0 && (
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 text-center text-sm text-slate-500">
-            لديك {tasks.filter(t => !t.completed).length} مهام متبقية لإنجازها
-          </div>
-        )}
+        <!-- Footer -->
+        <div class="flex-shrink-0 px-6 py-3 bg-slate-50 border-t border-slate-100 text-center text-xs font-medium text-slate-400 flex justify-between items-center">
+            <span>اسحب المهمة يميناً أو يساراً لحذفها</span>
+            <span id="taskCountText">0 مهام معروضة</span>
+        </div>
 
-      </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #cbd5e1;
-          border-radius: 20px;
-        }
-      `}} />
     </div>
-  );
-}
+
+    <script>
+        // --- البيانات الأساسية ---
+        let tasks = [
+            { id: 1, text: 'قراءة كتاب جديد', completed: false, date: new Date().toISOString() },
+            { id: 2, text: 'ممارسة الرياضة لمدة 30 دقيقة', completed: true, date: null },
+            { id: 3, text: 'سحب طبيعي وسريع الآن!', completed: false, date: null },
+        ];
+        
+        let currentFilter = 'all';
+        const SWIPE_THRESHOLD = 90;
+
+        // --- عناصر DOM ---
+        const taskInput = document.getElementById('taskInput');
+        const dateInput = document.getElementById('dateInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const taskForm = document.getElementById('taskForm');
+        const tasksList = document.getElementById('tasksList');
+        const emptyState = document.getElementById('emptyState');
+        const emptyStateSub = document.getElementById('emptyStateSub');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const taskCountText = document.getElementById('taskCountText');
+        const filtersContainer = document.getElementById('filtersContainer');
+        const dateIconBg = document.getElementById('dateIconBg');
+
+        // --- دوال مساعدة للتاريخ ---
+        const isToday = (dateStr) => {
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            const today = new Date();
+            return d.getDate() === today.getDate() &&
+                d.getMonth() === today.getMonth() &&
+                d.getFullYear() === today.getFullYear();
+        };
+
+        const isThisWeek = (dateStr) => {
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            const today = new Date();
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            startOfWeek.setHours(0, 0, 0, 0);
+            
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            return d >= startOfWeek && d <= endOfWeek;
+        };
+
+        const formatDate = (dateStr) => {
+            return new Intl.DateTimeFormat('ar-EG', { month: 'short', day: 'numeric' }).format(new Date(dateStr));
+        };
+
+        // --- تهيئة التطبيق ---
+        function init() {
+            renderFilters();
+            renderTasks();
+            lucide.createIcons();
+
+            // مستمعات الأحداث للإدخال
+            taskInput.addEventListener('input', () => {
+                submitBtn.disabled = taskInput.value.trim() === '';
+            });
+
+            dateInput.addEventListener('change', () => {
+                if (dateInput.value) {
+                    dateIconBg.classList.replace('border-slate-200', 'border-violet-400');
+                    dateIconBg.classList.replace('text-slate-400', 'text-violet-600');
+                    dateIconBg.classList.replace('bg-white', 'bg-violet-50');
+                } else {
+                    dateIconBg.classList.replace('border-violet-400', 'border-slate-200');
+                    dateIconBg.classList.replace('text-violet-600', 'text-slate-400');
+                    dateIconBg.classList.replace('bg-violet-50', 'bg-white');
+                }
+            });
+
+            taskForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const text = taskInput.value.trim();
+                if (!text) return;
+
+                tasks.unshift({
+                    id: Date.now(),
+                    text: text,
+                    completed: false,
+                    date: dateInput.value || null
+                });
+
+                taskInput.value = '';
+                dateInput.value = '';
+                submitBtn.disabled = true;
+                dateIconBg.classList.remove('border-violet-400', 'text-violet-600', 'bg-violet-50');
+                dateIconBg.classList.add('border-slate-200', 'text-slate-400', 'bg-white');
+
+                renderTasks();
+            });
+        }
+
+        // --- الفلاتر ---
+        const filters = [
+            { id: 'all', label: 'الكل', icon: 'inbox' },
+            { id: 'today', label: 'اليوم', icon: 'clock' },
+            { id: 'week', label: 'هذا الأسبوع', icon: 'calendar-days' },
+            { id: 'nodate', label: 'بدون تاريخ', icon: 'circle' }
+        ];
+
+        function renderFilters() {
+            filtersContainer.innerHTML = filters.map(f => `
+                <button
+                    onclick="setFilter('${f.id}')"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                        currentFilter === f.id 
+                            ? 'bg-violet-100 text-violet-700 shadow-sm' 
+                            : 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    }"
+                >
+                    <i data-lucide="${f.icon}" class="w-4 h-4"></i>
+                    ${f.label}
+                </button>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        window.setFilter = (filterId) => {
+            currentFilter = filterId;
+            renderFilters();
+            renderTasks();
+        };
+
+        function updateStats() {
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.completed).length;
+            const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+            
+            progressBar.style.width = `${progress}%`;
+            progressText.innerText = `${progress}%`;
+        }
+
+        function renderTasks() {
+            const filteredTasks = tasks.filter(task => {
+                if (currentFilter === 'all') return true;
+                if (currentFilter === 'today') return isToday(task.date);
+                if (currentFilter === 'week') return isThisWeek(task.date);
+                if (currentFilter === 'nodate') return !task.date;
+                return true;
+            });
+
+            taskCountText.innerText = `${filteredTasks.length} مهام معروضة`;
+            updateStats();
+
+            if (filteredTasks.length === 0) {
+                tasksList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                emptyStateSub.innerText = currentFilter === 'today' ? 'يومك فارغ حتى الآن!' : 
+                                          currentFilter === 'week' ? 'أسبوعك غير مخطط بعد!' :
+                                          'أضف مهمتك الأولى لتنظيم وقتك.';
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            tasksList.innerHTML = '';
+
+            filteredTasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = 'relative mb-3 group';
+                li.dataset.id = task.id;
+
+                const isDone = task.completed;
+
+                li.innerHTML = `
+                    <div class="trash-bg absolute inset-0 flex items-center justify-between px-6 rounded-2xl overflow-hidden transition-colors duration-300 bg-transparent">
+                        <div class="trash-right transition-all duration-300 opacity-0 scale-50">
+                            <i data-lucide="trash-2" class="w-7 h-7 text-rose-500"></i>
+                        </div>
+                        <div class="trash-left transition-all duration-300 opacity-0 scale-50">
+                            <i data-lucide="trash-2" class="w-7 h-7 text-rose-500"></i>
+                        </div>
+                    </div>
+
+                    <!-- كرت المهمة -->
+                    <div class="task-card relative z-10 p-4 rounded-2xl border cursor-grab active:cursor-grabbing select-none overflow-hidden ${
+                        isDone ? 'bg-slate-50 border-slate-100 opacity-75' : 'bg-white border-slate-200 shadow-sm hover:border-violet-200'
+                    }">
+                        <!-- المحتوى الداخلي -->
+                        <div class="flex items-center gap-4 toggle-btn relative z-10 w-full">
+                            <button class="flex-shrink-0 transition-colors duration-300 ${isDone ? 'text-emerald-500' : 'text-slate-300 group-hover:text-violet-500'}">
+                                <i data-lucide="${isDone ? 'check-circle-2' : 'circle'}" class="w-7 h-7"></i>
+                            </button>
+                            <div class="flex flex-col flex-1 overflow-hidden">
+                                <span class="text-lg truncate transition-all duration-300 ${isDone ? 'line-through text-slate-400' : 'text-slate-700'}">
+                                    ${task.text}
+                                </span>
+                                ${task.date ? `
+                                <span class="text-xs mt-1 flex items-center gap-1 ${isDone ? 'text-slate-300' : 'text-violet-500'}">
+                                    <i data-lucide="calendar" class="w-3 h-3"></i>
+                                    ${formatDate(task.date)}
+                                </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                tasksList.appendChild(li);
+                attachSwipeEvents(li, task.id);
+            });
+
+            lucide.createIcons();
+        }
+
+        function attachSwipeEvents(liElement, taskId) {
+            const card = liElement.querySelector('.task-card');
+            const trashBg = liElement.querySelector('.trash-bg');
+            const trashRight = liElement.querySelector('.trash-right');
+            const trashLeft = liElement.querySelector('.trash-left');
+            const toggleBtn = liElement.querySelector('.toggle-btn');
+
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            let isDeleting = false;
+
+            const handleStart = (clientX) => {
+                if (isDeleting) return;
+                startX = clientX;
+                isDragging = true;
+                card.classList.add('dragging');
+            };
+
+            const handleMove = (clientX) => {
+                if (!isDragging || isDeleting) return;
+                currentX = clientX - startX;
+                card.style.transform = `translateX(${currentX}px)`;
+
+                if (Math.abs(currentX) > 20) {
+                    trashBg.classList.replace('bg-transparent', 'bg-rose-100');
+                    if (currentX > 0) { 
+                        trashRight.classList.replace('opacity-0', 'opacity-100');
+                        trashRight.classList.replace('scale-50', 'scale-100');
+                        trashLeft.classList.replace('opacity-100', 'opacity-0');
+                        trashLeft.classList.replace('scale-100', 'scale-50');
+                    } else { 
+                        trashLeft.classList.replace('opacity-0', 'opacity-100');
+                        trashLeft.classList.replace('scale-50', 'scale-100');
+                        trashRight.classList.replace('opacity-100', 'opacity-0');
+                        trashRight.classList.replace('scale-100', 'scale-50');
+                    }
+                } else {
+                    trashBg.classList.replace('bg-rose-100', 'bg-transparent');
+                    trashRight.classList.replace('opacity-100', 'opacity-0');
+                    trashRight.classList.replace('scale-100', 'scale-50');
+                    trashLeft.classList.replace('opacity-100', 'opacity-0');
+                    trashLeft.classList.replace('scale-100', 'scale-50');
+                }
+            };
+
+            const handleEnd = () => {
+                if (!isDragging || isDeleting) return;
+                isDragging = false;
+                card.classList.remove('dragging');
+
+                if (currentX > SWIPE_THRESHOLD) {
+                    executeSwipeDelete('right');
+                } else if (currentX < -SWIPE_THRESHOLD) {
+                    executeSwipeDelete('left');
+                } else {
+                    card.style.transform = `translateX(0px)`;
+                    currentX = 0;
+                    trashBg.classList.replace('bg-rose-100', 'bg-transparent');
+                    trashRight.classList.replace('opacity-100', 'opacity-0');
+                    trashLeft.classList.replace('opacity-100', 'opacity-0');
+                }
+            };
+
+            const executeSwipeDelete = (direction) => {
+                isDeleting = true;
+                
+                if (direction === 'right') {
+                    card.classList.add('swipe-out-right');
+                } else {
+                    card.classList.add('swipe-out-left');
+                }
+
+                setTimeout(() => {
+                    tasks = tasks.filter(t => t.id !== taskId);
+                    renderTasks();
+                }, 300); // 300ms تتوافق مع سرعة الانزلاق الجديدة
+            };
+
+            card.addEventListener('mousedown', (e) => handleStart(e.clientX));
+            window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+            window.addEventListener('mouseup', handleEnd);
+
+            card.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX), {passive: true});
+            card.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), {passive: true});
+            card.addEventListener('touchend', handleEnd);
+
+            toggleBtn.addEventListener('click', (e) => {
+                if (Math.abs(currentX) > 5) {
+                    e.preventDefault();
+                    return;
+                }
+                const taskIndex = tasks.findIndex(t => t.id === taskId);
+                if (taskIndex > -1) {
+                    tasks[taskIndex].completed = !tasks[taskIndex].completed;
+                    renderTasks();
+                }
+            });
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
